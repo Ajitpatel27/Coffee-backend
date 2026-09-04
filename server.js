@@ -38,10 +38,6 @@ async function connectDatabase() {
 }
 
 app.use(async (_req, res, next) => {
-  if (_req.path === "/api/health") {
-    return next();
-  }
-
   try {
     await connectDatabase();
     next();
@@ -98,7 +94,7 @@ app.get("/api/orders", async (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", database: mongoose.connection.readyState === 1 ? "connected" : "not connected" });
+  res.json({ status: "ok", database: "connected" });
 });
 
 if (require.main === module) {
