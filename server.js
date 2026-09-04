@@ -16,6 +16,13 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+  });
+});
+
 let databaseConnection;
 
 async function connectDatabase() {
@@ -28,7 +35,13 @@ async function connectDatabase() {
   }
 
   if (!databaseConnection) {
-    databaseConnection = mongoose.connect(MONGO_URI).catch((error) => {
+    databaseConnection = mongoose.connect(MONGO_URI, {
+      serverApi: {
+        version: "1",
+        strict: true,
+        deprecationErrors: true,
+      },
+    }).catch((error) => {
       databaseConnection = undefined;
       throw error;
     });
@@ -93,8 +106,13 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", database: "connected" });
+app.use((error, _req, res, _next) => {
+  if (error instanceof SyntaxError && error.status === 400 && "body" in error) {
+    return res.status(400).json({ error: "Request body must contain valid JSON." });
+  }
+
+  console.error("Unhandled server error:", error);
+  return res.status(500).json({ error: "An unexpected server error occurred." });
 });
 
 if (require.main === module) {
