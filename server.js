@@ -1,4 +1,3 @@
-const path = require("path");
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -8,7 +7,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/coffee-website";
+const MONGO_URI = process.env.MONGO_URI;
 
 const Contact = require("./models/Contact");
 const Order = require("./models/Order");
@@ -16,6 +15,33 @@ const Order = require("./models/Order");
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+let databaseConnection;
+
+async function connectDatabase() {
+  if (!MONGO_URI) {
+    throw new Error("MONGO_URI environment variable is required.");
+  }
+
+  if (!databaseConnection) {
+    databaseConnection = mongoose.connect(MONGO_URI).catch((error) => {
+      databaseConnection = undefined;
+      throw error;
+    });
+  }
+
+  await databaseConnection;
+}
+
+app.use(async (_req, res, next) => {
+  try {
+    await connectDatabase();
+    next();
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
+    res.status(500).json({ error: "Database connection failed." });
+  }
+});
 
 app.post("/api/contact", async (req, res) => {
   const { name, email, message } = req.body;
@@ -67,22 +93,8 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-const publicPath = path.join(__dirname, "..");
-app.use(express.static(publicPath));
-app.get("*", (req, res) => {
-  res.sendFile(path.join(publicPath, "index.html"));
-});
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}
 
-mongoose
-  .connect(MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => {
-    console.log("MongoDB connected");
-    app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-  })
-  .catch((error) => {
-    console.error("MongoDB connection error:", error);
-    process.exit(1);
-  });
+module.exports = app;
