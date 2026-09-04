@@ -23,6 +23,10 @@ async function connectDatabase() {
     throw new Error("MONGO_URI environment variable is required.");
   }
 
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+
   if (!databaseConnection) {
     databaseConnection = mongoose.connect(MONGO_URI).catch((error) => {
       databaseConnection = undefined;
@@ -34,6 +38,10 @@ async function connectDatabase() {
 }
 
 app.use(async (_req, res, next) => {
+  if (_req.path === "/api/health") {
+    return next();
+  }
+
   try {
     await connectDatabase();
     next();
@@ -90,7 +98,7 @@ app.get("/api/orders", async (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.json({ status: "ok", database: mongoose.connection.readyState === 1 ? "connected" : "not connected" });
 });
 
 if (require.main === module) {
