@@ -32,6 +32,11 @@ const orderSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    tableNumber: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     items: [
       {
         name: { type: String, trim: true, default: "" },
@@ -41,10 +46,6 @@ const orderSchema = new mongoose.Schema(
       },
     ],
     subtotal: {
-      type: Number,
-      default: 0,
-    },
-    deliveryCharge: {
       type: Number,
       default: 0,
     },
