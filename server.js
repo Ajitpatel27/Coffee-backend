@@ -12,6 +12,13 @@ const MONGO_URI = process.env.MONGO_URI;
 const Contact = require("./models/Contact");
 const Order = require("./models/Order");
 
+const inMemoryStore = {
+  contacts: [],
+  orders: [],
+};
+
+let databaseAvailable = false;
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -27,11 +34,12 @@ let databaseConnection;
 
 async function connectDatabase() {
   if (!MONGO_URI) {
-    throw new Error("MONGO_URI environment variable is required.");
+    console.warn("MONGO_URI not configured; falling back to in-memory storage.");
+    return false;
   }
 
   if (mongoose.connection.readyState === 1) {
-    return;
+    return true;
   }
 
   if (!databaseConnection) {
@@ -48,16 +56,18 @@ async function connectDatabase() {
   }
 
   await databaseConnection;
+  return true;
 }
 
-app.use(async (_req, res, next) => {
+app.use(async (_req, _res, next) => {
   try {
-    await connectDatabase();
-    next();
+    databaseAvailable = await connectDatabase();
   } catch (error) {
-    console.error("MongoDB connection error:", error);
-    res.status(500).json({ error: "Database connection failed." });
+    console.warn("MongoDB unavailable; using in-memory storage for development.", error.message);
+    databaseAvailable = false;
   }
+
+  next();
 });
 
 app.post("/api/contact", async (req, res) => {
@@ -68,9 +78,13 @@ app.post("/api/contact", async (req, res) => {
   }
 
   try {
-    const contact = new Contact({ name, email, message });
-    await contact.save();
+    if (databaseAvailable) {
+      const contact = new Contact({ name, email, message });
+      await contact.save();
+      return res.status(201).json({ message: "Contact saved successfully." });
+    }
 
+    inMemoryStore.contacts.push({ name, email, message, createdAt: new Date().toISOString() });
     return res.status(201).json({ message: "Contact saved successfully." });
   } catch (error) {
     console.error("Contact save error:", error);
@@ -86,9 +100,14 @@ app.post("/api/orders", async (req, res) => {
   }
 
   try {
-    const order = new Order({ name, email, drink, dessert, snack, notes });
-    await order.save();
+    if (databaseAvailable) {
+      const order = new Order({ name, email, drink, dessert, snack, notes });
+      await order.save();
+      return res.status(201).json({ message: "Order saved successfully.", order });
+    }
 
+    const order = { name, email, drink, dessert, snack, notes, createdAt: new Date().toISOString() };
+    inMemoryStore.orders.push(order);
     return res.status(201).json({ message: "Order saved successfully.", order });
   } catch (error) {
     console.error("Order save error:", error);
@@ -98,6 +117,10 @@ app.post("/api/orders", async (req, res) => {
 
 app.get("/api/orders", async (req, res) => {
   try {
+    if (!databaseAvailable) {
+      return res.status(200).json({ orders: inMemoryStore.orders });
+    }
+
     const orders = await Order.find().sort({ createdAt: -1 });
     return res.status(200).json({ orders });
   } catch (error) {
