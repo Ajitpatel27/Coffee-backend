@@ -115,22 +115,37 @@ app.post("/api/contact", async (req, res) => {
 });
 
 app.post("/api/orders", async (req, res) => {
-  const { name, email, drink, dessert, snack, notes } = req.body;
+  const { name, email, drink, dessert, snack, notes, items, paymentMethod } = req.body;
+  const selectedItems = Array.isArray(items) && items.length > 0 ? items : [];
+  const resolvedDrink = drink || (selectedItems[0] && selectedItems[0].name) || "";
+  const resolvedDessert = dessert || "";
+  const resolvedSnack = snack || "";
 
-  if (!name || !email || !drink) {
-    return res.status(400).json({ error: "Name, email, and drink selection are required." });
+  if (!name || !email || (!resolvedDrink && selectedItems.length === 0)) {
+    return res.status(400).json({ error: "Name, email, and at least one ordered item are required." });
   }
 
   try {
     await ensureDatabaseReady();
 
+    const orderRecord = {
+      name,
+      email,
+      drink: resolvedDrink,
+      dessert: resolvedDessert,
+      snack: resolvedSnack,
+      notes: notes || (paymentMethod ? `Payment method: ${paymentMethod}` : ""),
+      items: selectedItems,
+      paymentMethod,
+    };
+
     if (databaseAvailable) {
-      const order = new Order({ name, email, drink, dessert, snack, notes });
+      const order = new Order(orderRecord);
       await order.save();
       return res.status(201).json({ message: "Order saved successfully.", order });
     }
 
-    const order = { name, email, drink, dessert, snack, notes, createdAt: new Date().toISOString() };
+    const order = { ...orderRecord, createdAt: new Date().toISOString() };
     inMemoryStore.orders.push(order);
     return res.status(201).json({ message: "Order saved successfully.", order });
   } catch (error) {

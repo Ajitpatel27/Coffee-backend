@@ -14,8 +14,8 @@ const orderSchema = new mongoose.Schema(
     },
     drink: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
     dessert: {
       type: String,
@@ -30,6 +30,32 @@ const orderSchema = new mongoose.Schema(
     notes: {
       type: String,
       trim: true,
+      default: "",
+    },
+    items: [
+      {
+        name: { type: String, trim: true, default: "" },
+        price: { type: Number, default: 0 },
+        category: { type: String, trim: true, default: "" },
+        quantity: { type: Number, default: 1 },
+      },
+    ],
+    subtotal: {
+      type: Number,
+      default: 0,
+    },
+    deliveryCharge: {
+      type: Number,
+      default: 0,
+    },
+    total: {
+      type: Number,
+      default: 0,
+    },
+    paymentMethod: {
+      type: String,
+      trim: true,
+      default: "",
     },
   },
   { timestamps: true, collection: "orders" }
