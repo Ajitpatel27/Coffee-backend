@@ -34,7 +34,8 @@ app.get("/", (_req, res) => {
   });
 });
 
-app.get("/api/health", (_req, res) => {
+app.get("/api/health", async (_req, res) => {
+  await ensureDatabaseReady();
   res.json({
     status: "ok",
     database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
@@ -70,14 +71,22 @@ async function connectDatabase() {
   return true;
 }
 
-app.use(async (_req, _res, next) => {
+async function ensureDatabaseReady() {
   try {
     databaseAvailable = await connectDatabase();
+    if (databaseAvailable) {
+      console.log("MongoDB connected successfully.");
+    }
+    return databaseAvailable;
   } catch (error) {
     console.warn("MongoDB unavailable; using in-memory storage for development.", error.message);
     databaseAvailable = false;
+    return false;
   }
+}
 
+app.use(async (_req, _res, next) => {
+  await ensureDatabaseReady();
   next();
 });
 
@@ -89,6 +98,8 @@ app.post("/api/contact", async (req, res) => {
   }
 
   try {
+    await ensureDatabaseReady();
+
     if (databaseAvailable) {
       const contact = new Contact({ name, email, message });
       await contact.save();
@@ -111,6 +122,8 @@ app.post("/api/orders", async (req, res) => {
   }
 
   try {
+    await ensureDatabaseReady();
+
     if (databaseAvailable) {
       const order = new Order({ name, email, drink, dessert, snack, notes });
       await order.save();
@@ -128,6 +141,8 @@ app.post("/api/orders", async (req, res) => {
 
 app.get("/api/orders", async (req, res) => {
   try {
+    await ensureDatabaseReady();
+
     if (!databaseAvailable) {
       return res.status(200).json({ orders: inMemoryStore.orders });
     }
@@ -149,8 +164,16 @@ app.use((error, _req, res, _next) => {
   return res.status(500).json({ error: "An unexpected server error occurred." });
 });
 
-if (require.main === module) {
+async function startServer() {
+  await ensureDatabaseReady();
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}
+
+if (require.main === module) {
+  startServer().catch((error) => {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  });
 }
 
 module.exports = app;
