@@ -115,11 +115,14 @@ app.post("/api/contact", async (req, res) => {
 });
 
 app.post("/api/orders", async (req, res) => {
-  const { name, email, drink, dessert, snack, notes, items, paymentMethod } = req.body;
+  const { name, email, drink, dessert, snack, notes, items, subtotal, deliveryCharge, total, paymentMethod } = req.body;
   const selectedItems = Array.isArray(items) && items.length > 0 ? items : [];
   const resolvedDrink = drink || (selectedItems[0] && selectedItems[0].name) || "";
   const resolvedDessert = dessert || "";
   const resolvedSnack = snack || "";
+  const numericSubtotal = Number(subtotal) || 0;
+  const numericDeliveryCharge = Number(deliveryCharge) || 0;
+  const numericTotal = Number(total) || numericSubtotal + numericDeliveryCharge;
 
   if (!name || !email || (!resolvedDrink && selectedItems.length === 0)) {
     return res.status(400).json({ error: "Name, email, and at least one ordered item are required." });
@@ -135,8 +138,16 @@ app.post("/api/orders", async (req, res) => {
       dessert: resolvedDessert,
       snack: resolvedSnack,
       notes: notes || (paymentMethod ? `Payment method: ${paymentMethod}` : ""),
-      items: selectedItems,
-      paymentMethod,
+      items: selectedItems.map((item) => ({
+        name: item.name || "",
+        price: Number(item.price) || 0,
+        category: item.category || "",
+        quantity: Number(item.quantity) || 1,
+      })),
+      subtotal: numericSubtotal,
+      deliveryCharge: numericDeliveryCharge,
+      total: numericTotal,
+      paymentMethod: paymentMethod || "",
     };
 
     if (databaseAvailable) {
