@@ -23,6 +23,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/", (_req, res) => {
+  res.json({
+    message: "Coffee API is running.",
+    endpoints: [
+      "/api/health",
+      "/api/contact",
+      "/api/orders",
+    ],
+  });
+});
+
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
